@@ -1,6 +1,6 @@
 <div align="center">
 
-# kraken_ (WEB)
+# Kraken (Web)
 
 > Extract email addresses from GitHub commit history.
 
