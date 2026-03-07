@@ -14,7 +14,7 @@
 
 ## Overview
 
-**kraken** is a web-based OSINT tool that extracts public email addresses from GitHub user commit histories. It scrapes commit patch metadata from public repositories and parses git headers to surface email addresses that may not appear on a user's profile.
+**Kraken (Web)** is a web-based OSINT tool that extracts public email addresses from GitHub user commit histories. It scrapes commit patch metadata from public repositories and parses git headers to surface email addresses that may not appear on a user's profile.
 
 ---
 
