@@ -1,0 +1,44 @@
+/* Defines global styles, custom fonts, and animation keyframes for the terminal UI */
+@import 'tailwindcss';
+
+@theme {
+	--font-mono: 'JetBrains Mono', 'Fira Code', 'SF Mono', 'Cascadia Code', ui-monospace, monospace;
+}
+
+@keyframes fade-in {
+	from { opacity: 0; transform: translateY(8px); }
+	to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slide-up {
+	from { opacity: 0; transform: translateY(16px); }
+	to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes pulse-border {
+	0%, 100% { border-color: rgb(63 63 70); }
+	50% { border-color: rgb(161 161 170); }
+}
+
+@keyframes shimmer {
+	0% { background-position: -200% 0; }
+	100% { background-position: 200% 0; }
+}
+
+.animate-fade-in {
+	animation: fade-in 0.4s ease-out both;
+}
+
+.animate-slide-up {
+	animation: slide-up 0.5s ease-out both;
+}
+
+.animate-pulse-border {
+	animation: pulse-border 2s ease-in-out infinite;
+}
+
+.animate-shimmer {
+	background: linear-gradient(90deg, transparent 0%, rgb(39 39 42) 50%, transparent 100%);
+	background-size: 200% 100%;
+	animation: shimmer 1.5s ease-in-out infinite;
+}
