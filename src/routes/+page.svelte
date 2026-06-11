@@ -1,18 +1,18 @@
 <script lang="ts">
 	// Combined Kraken console. Two directions share one shell:
-	//  · forward (username → emails): scrapes public commit patches, ranks matches
-	//  · reverse (email → account): probes commit-author linking with your token
+	//  · forward (find emails): scrapes public commit patches, ranks matches
+	//  · reverse (find account): probes commit-author linking with your token
 	import { onMount } from 'svelte';
 	import type { ExtractResult, MatchTier, ProbeResult } from '$lib';
 
 	type Direction = 'forward' | 'reverse';
 	const DIRECTIONS: Direction[] = ['forward', 'reverse'];
 	const DIRECTION_LABELS: Record<Direction, string> = {
-		forward: 'username → emails',
-		reverse: 'email → account'
+		forward: 'find emails',
+		reverse: 'find account'
 	};
 
-	// Forward scan presets — each does progressively more work.
+	// Forward scan presets. Each does progressively more work.
 	const MODES = {
 		fast: { repos: 3, commits: 3, note: 'quick sweep' },
 		default: { repos: 6, commits: 5, note: 'balanced' },
@@ -53,6 +53,11 @@
 	let stageTimer: ReturnType<typeof setInterval> | null = null;
 	let copyTimer: ReturnType<typeof setTimeout> | null = null;
 
+	// Wordmark decode animation on first load.
+	const WORDMARK = 'kraken';
+	const SCRAMBLE_GLYPHS = '!<>-_\\/[]{}=+*^?#%@$01';
+	let displayName = $state(WORDMARK);
+
 	// ----- forward state -----
 	let query = $state('');
 	let mode = $state<Mode>('default');
@@ -80,18 +85,6 @@
 		Boolean(operator) && email.trim().length > 0 && !loading && !editingToken
 	);
 
-	const statusLabel = $derived(
-		loading
-			? direction === 'forward'
-				? 'scanning'
-				: 'probing'
-			: error
-				? 'error'
-				: direction === 'reverse' && !operator
-					? 'no token'
-					: 'ready'
-	);
-
 	const tally = $derived.by(() => {
 		const t = { likely: 0, possible: 0, unlikely: 0 };
 		if (extractResult) for (const m of extractResult.emails) t[m.tier] += 1;
@@ -107,6 +100,31 @@
 	});
 
 	onMount(() => {
+		// Decode the wordmark from scrambled glyphs into "kraken".
+		const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+		if (!reduce) {
+			const settleAt = WORDMARK.split('').map((_, i) => 160 + i * 95);
+			const startT = performance.now();
+			const id = setInterval(() => {
+				const t = performance.now() - startT;
+				let out = '';
+				let done = true;
+				for (let i = 0; i < WORDMARK.length; i++) {
+					if (t >= settleAt[i]) {
+						out += WORDMARK[i];
+					} else {
+						out += SCRAMBLE_GLYPHS[(Math.random() * SCRAMBLE_GLYPHS.length) | 0];
+						done = false;
+					}
+				}
+				displayName = out;
+				if (done) {
+					clearInterval(id);
+					displayName = WORDMARK;
+				}
+			}, 45);
+		}
+
 		const saved = localStorage.getItem(TOKEN_KEY);
 		if (saved) {
 			token = saved;
@@ -294,7 +312,7 @@
 </script>
 
 <svelte:head>
-	<title>kraken — github identity intelligence</title>
+	<title>kraken · github identity intelligence</title>
 	<meta
 		name="description"
 		content="Resolve emails from a GitHub username, or the GitHub account behind an email."
@@ -308,45 +326,23 @@
 </svelte:head>
 
 <main class="min-h-screen flex flex-col items-center px-5 py-16 sm:py-24">
+	<div class="boot-sweep" aria-hidden="true"></div>
 	<div class="w-full max-w-xl" style="font-family: var(--font-mono)">
 		<!-- Header -->
-		<header class="anim-rise flex items-end justify-between">
-			<div>
-				<h1
-					class="text-4xl font-bold tracking-tight leading-none"
-					style="font-family: var(--font-display); color: var(--text)"
-				>
-					kraken<span class="cursor-blink" style="color: var(--signal)">_</span>
-				</h1>
-				<p class="mt-2 text-[11px] uppercase tracking-[0.25em]" style="color: var(--muted)">
-					github identity intelligence
-				</p>
-			</div>
-			<div class="flex items-center gap-2 pb-1">
-				<span class="relative flex h-2 w-2">
-					{#if loading}
-						<span class="absolute inset-0 rounded-full live-ring" style="background: var(--probe)"
-						></span>
-					{/if}
-					<span
-						class="h-2 w-2 rounded-full {loading ? 'status-dot' : ''}"
-						style="background: {loading
-							? 'var(--probe)'
-							: error
-								? 'var(--danger)'
-								: direction === 'reverse' && !operator
-									? 'var(--faint)'
-									: 'var(--signal)'}"
-					></span>
-				</span>
-				<span class="text-[10px] uppercase tracking-[0.2em]" style="color: var(--muted)">
-					{statusLabel}
-				</span>
-			</div>
+		<header class="anim-rise">
+			<h1
+				class="text-4xl font-bold tracking-tight leading-none"
+				style="font-family: var(--font-display); color: var(--text)"
+			>
+				{displayName}<span class="cursor-blink" style="color: var(--signal)">_</span>
+			</h1>
+			<p class="mt-2 text-[11px] uppercase tracking-[0.25em]" style="color: var(--muted)">
+				github identity intelligence
+			</p>
 		</header>
 
 		<!-- Direction toggle -->
-		<section class="anim-rise mt-8" style="animation-delay: 40ms">
+		<section class="anim-rise mt-8" style="animation-delay: 80ms">
 			<div
 				class="segmented w-full"
 				style="--idx: {directionIndex}; --cols: 2"
@@ -366,8 +362,8 @@
 		</section>
 
 		{#if direction === 'forward'}
-			<!-- Forward: username → emails -->
-			<section class="anim-rise-sm mt-4">
+			<!-- Forward: find emails from a username -->
+			<section class="anim-rise-sm mt-4" style="animation-delay: 140ms">
 				<div class="flex gap-2.5">
 					<label class="field flex-1 flex items-center rounded-lg px-3.5">
 						<span class="select-none text-sm pr-2" style="color: var(--signal)">&gt;</span>
@@ -416,8 +412,8 @@
 				</div>
 			</section>
 		{:else}
-			<!-- Reverse: email → account -->
-			<section class="anim-rise-sm mt-4">
+			<!-- Reverse: find the account behind an email -->
+			<section class="anim-rise-sm mt-4" style="animation-delay: 140ms">
 				{#if editingToken}
 					<div class="panel rounded-xl p-4">
 						<div class="flex items-center justify-between mb-2">
@@ -425,7 +421,7 @@
 								github token
 							</p>
 							<a class="link-accent text-[10px] uppercase tracking-[0.15em]" href={TOKEN_NEW_URL}
-								target="_blank" rel="noreferrer">create one ↗</a
+								target="_blank" rel="noreferrer">create token</a
 							>
 						</div>
 						<div class="flex gap-2.5">
@@ -461,7 +457,7 @@
 						</label>
 						<p class="text-[10px] mt-2 leading-relaxed" style="color: var(--faint)">
 							Your token is sent per request and never stored on the server. It needs repo +
-							delete_repo scope — a powerful token, so prefer a short-lived one and revoke it when
+							delete_repo scope, which is powerful, so prefer a short-lived one and revoke it when
 							done.
 						</p>
 					</div>
@@ -758,16 +754,13 @@
 			{:else}
 				<p class="text-[11px] leading-relaxed" style="color: var(--faint)">
 					Creates a throwaway private repo under your own account, authors a commit with the target
-					email, and reads back whether GitHub links it to a profile — then deletes the repo. Only
+					email, and reads back whether GitHub links it to a profile, then deletes the repo. Only
 					public profile data is returned. Anyone can prevent this by enabling
 					<a class="link-accent" href="https://github.com/settings/emails" target="_blank"
 						rel="noreferrer">keep my email addresses private</a
 					> in their GitHub settings.
 				</p>
 			{/if}
-			<p class="text-[10px] uppercase tracking-[0.2em] mt-4" style="color: var(--faint)">
-				part of project eyrie
-			</p>
 		</footer>
 	</div>
 </main>

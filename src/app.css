@@ -65,14 +65,6 @@ body {
 	0% { transform: translateX(-100%); }
 	100% { transform: translateX(320%); }
 }
-@keyframes dot-pulse {
-	0%, 100% { opacity: 0.35; transform: scale(0.85); }
-	50% { opacity: 1; transform: scale(1); }
-}
-@keyframes ring {
-	0% { box-shadow: 0 0 0 0 rgba(var(--probe-rgb), 0.5); }
-	100% { box-shadow: 0 0 0 7px rgba(var(--probe-rgb), 0); }
-}
 @keyframes bar-grow { to { transform: scaleX(var(--frac)); } }
 @keyframes sheen { to { transform: translateX(130%); } }
 @keyframes soft-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.55; } }
@@ -80,13 +72,31 @@ body {
 	from { opacity: 0; transform: scale(0.8) rotate(-6deg); }
 	to { opacity: 1; transform: scale(1) rotate(0); }
 }
+@keyframes boot-down {
+	0% { transform: translateY(-120%); opacity: 0; }
+	14% { opacity: 1; }
+	100% { transform: translateY(190vh); opacity: 0; }
+}
+
+/* one-shot scanline wipe on first paint */
+.boot-sweep {
+	position: fixed;
+	left: 0;
+	right: 0;
+	top: 0;
+	height: 32vh;
+	z-index: 40;
+	pointer-events: none;
+	background: linear-gradient(to bottom, rgba(var(--signal-rgb), 0.1), transparent);
+	border-top: 1px solid rgba(var(--probe-rgb), 0.35);
+	transform: translateY(-120%);
+	animation: boot-down 1.2s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
 
 /* ---------- utilities ---------- */
 .anim-rise { animation: rise 0.5s cubic-bezier(0.16, 1, 0.3, 1) both; }
 .anim-rise-sm { animation: rise-sm 0.4s cubic-bezier(0.16, 1, 0.3, 1) both; }
 .cursor-blink { animation: blink 1.1s steps(1) infinite; }
-.status-dot { animation: dot-pulse 1.2s ease-in-out infinite; }
-.live-ring { animation: ring 1.4s ease-out infinite; }
 .pulse-marker { animation: soft-pulse 1.9s ease-in-out infinite; }
 .avatar-in { animation: avatar-in 0.5s cubic-bezier(0.16, 1, 0.3, 1) both; }
 
@@ -216,4 +226,5 @@ body {
 	.scan-track::after { display: none; }
 	.meter-fill { transform: scaleX(var(--frac)); }
 	.seg-thumb { transition: none; }
+	.boot-sweep { display: none; }
 }
