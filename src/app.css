@@ -8,21 +8,23 @@
 }
 
 :root {
-	/* Palette — grounded in the project's amber/slate brand */
-	--bg: #08090d;
-	--bg-grain: #0b0d12;
-	--surface: #0f121a;
-	--surface-2: #131722;
-	--line: #1d2230;
-	--line-soft: #161a24;
-	--text: #e7eaf0;
-	--muted: #6c7486;
-	--faint: #444b5a;
-	/* signal = brand amber, probe = active-scan teal */
-	--signal: #f5a623;
-	--signal-dim: #b4791a;
-	--probe: #34d3c0;
-	--probe-dim: #1f8a7f;
+	/* Palette — green-on-grey terminal. Neutral greys, no blue tint. */
+	--bg: #08090a;
+	--bg-grain: #0c0d0e;
+	--surface: #111315;
+	--surface-2: #16181b;
+	--line: #24272c;
+	--line-soft: #1a1c20;
+	--text: #e9ecee;
+	--muted: #7a8086;
+	--faint: #4b5158;
+	/* signal = primary green, probe = lighter active-scan green (GitHub palette) */
+	--signal: #3fb950;
+	--signal-rgb: 63, 185, 80;
+	--signal-dim: #2ea043;
+	--probe: #7ee787;
+	--probe-rgb: 126, 231, 135;
+	--probe-dim: #56d364;
 	--danger: #f06363;
 }
 
@@ -39,7 +41,7 @@ body {
 	background-color: var(--bg);
 	/* faint scanline + corner glow, kept very low contrast */
 	background-image:
-		radial-gradient(120% 80% at 50% -10%, rgba(245, 166, 35, 0.06), transparent 60%),
+		radial-gradient(120% 80% at 50% -10%, rgba(var(--signal-rgb), 0.05), transparent 60%),
 		repeating-linear-gradient(
 			0deg,
 			rgba(255, 255, 255, 0.012) 0px,
@@ -77,8 +79,8 @@ body {
 	50% { opacity: 1; transform: scale(1); }
 }
 @keyframes ring {
-	0% { box-shadow: 0 0 0 0 rgba(52, 211, 192, 0.5); }
-	100% { box-shadow: 0 0 0 7px rgba(52, 211, 192, 0); }
+	0% { box-shadow: 0 0 0 0 rgba(var(--probe-rgb), 0.5); }
+	100% { box-shadow: 0 0 0 7px rgba(var(--probe-rgb), 0); }
 }
 
 /* ---------- utilities ---------- */
@@ -92,7 +94,7 @@ body {
 	position: absolute;
 	inset: 0;
 	width: 30%;
-	background: linear-gradient(90deg, transparent, rgba(52, 211, 192, 0.5), transparent);
+	background: linear-gradient(90deg, transparent, rgba(var(--probe-rgb), 0.5), transparent);
 	animation: scan-sweep 1.25s ease-in-out infinite;
 }
 
@@ -117,8 +119,8 @@ body {
 }
 .field:focus-within {
 	border-color: var(--signal);
-	box-shadow: 0 0 0 1px rgba(245, 166, 35, 0.25), 0 0 24px -8px rgba(245, 166, 35, 0.5);
-	background: #14161f;
+	box-shadow: 0 0 0 1px rgba(var(--signal-rgb), 0.25), 0 0 24px -8px rgba(var(--signal-rgb), 0.5);
+	background: #16181b;
 }
 
 .field-input::placeholder { color: var(--faint); }
@@ -127,16 +129,103 @@ body {
 	background: var(--signal);
 	color: #0a0a0a;
 	transition: transform 0.15s ease, box-shadow 0.2s ease, opacity 0.2s ease, background 0.2s ease;
-	box-shadow: 0 8px 24px -12px rgba(245, 166, 35, 0.8);
+	box-shadow: 0 8px 24px -12px rgba(var(--signal-rgb), 0.8);
 }
-.btn-run:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 12px 28px -10px rgba(245, 166, 35, 0.9); }
+.btn-run:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 12px 28px -10px rgba(var(--signal-rgb), 0.9); }
 .btn-run:active:not(:disabled) { transform: translateY(0); }
 .btn-run:disabled { opacity: 0.35; cursor: not-allowed; box-shadow: none; }
 
-.row-email { transition: background 0.2s ease, border-color 0.2s ease; }
-.row-email:hover { background: var(--surface-2); }
+.row-email {
+	border-left: 2px solid transparent;
+	transition: background 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
+}
+.row-email:hover {
+	background: var(--surface-2);
+	border-left-color: var(--probe);
+	transform: translateX(3px);
+}
 
 .ghost-btn { transition: color 0.2s ease, background 0.2s ease, border-color 0.2s ease; }
+
+/* segmented scan-mode control with a sliding thumb */
+.segmented {
+	position: relative;
+	display: inline-grid;
+	grid-template-columns: repeat(3, minmax(60px, 1fr));
+	padding: 3px;
+	border: 1px solid var(--line);
+	border-radius: 0.6rem;
+	background: var(--surface-2);
+}
+.seg-thumb {
+	position: absolute;
+	top: 3px;
+	bottom: 3px;
+	left: 3px;
+	width: calc((100% - 6px) / 3);
+	border-radius: 0.45rem;
+	background: rgba(var(--signal-rgb), 0.14);
+	border: 1px solid rgba(var(--signal-rgb), 0.5);
+	transform: translateX(calc(var(--idx) * 100%));
+	transition: transform 0.38s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.seg {
+	position: relative;
+	z-index: 1;
+	padding: 0.4rem 0.25rem;
+	font-size: 12px;
+	text-transform: lowercase;
+	letter-spacing: 0.05em;
+	text-align: center;
+	color: var(--muted);
+	background: transparent;
+	transition: color 0.25s ease;
+}
+.seg:hover:not(:disabled) { color: var(--text); }
+.seg[aria-pressed='true'] { color: var(--signal); font-weight: 700; }
+.seg:disabled { cursor: not-allowed; }
+
+/* confidence meter bar under each match */
+.meter {
+	height: 2px;
+	border-radius: 2px;
+	background: var(--line);
+	overflow: hidden;
+}
+.meter-fill {
+	display: block;
+	height: 100%;
+	width: 100%;
+	border-radius: 2px;
+	transform-origin: left;
+	transform: scaleX(0);
+	animation: bar-grow 0.85s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+@keyframes bar-grow {
+	to { transform: scaleX(var(--frac)); }
+}
+
+/* sheen sweep across the extract button on hover */
+.btn-run { position: relative; overflow: hidden; }
+.btn-run::after {
+	content: '';
+	position: absolute;
+	inset: 0;
+	background: linear-gradient(120deg, transparent 35%, rgba(255, 255, 255, 0.4) 50%, transparent 65%);
+	transform: translateX(-130%);
+	pointer-events: none;
+}
+.btn-run:hover:not(:disabled)::after { animation: sheen 0.6s ease; }
+@keyframes sheen {
+	to { transform: translateX(130%); }
+}
+
+/* soft pulse on the best-guess marker */
+.pulse-marker { animation: soft-pulse 1.9s ease-in-out infinite; }
+@keyframes soft-pulse {
+	0%, 100% { opacity: 1; }
+	50% { opacity: 0.55; }
+}
 
 @media (prefers-reduced-motion: reduce) {
 	*, *::after, *::before {
@@ -145,4 +234,7 @@ body {
 		transition-duration: 0.001ms !important;
 	}
 	.scan-track::after { display: none; }
+	/* settle animated elements at their final state rather than zeroing them */
+	.meter-fill { transform: scaleX(var(--frac)); }
+	.seg-thumb { transition: none; }
 }

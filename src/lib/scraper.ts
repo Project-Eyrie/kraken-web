@@ -1,4 +1,6 @@
-// Scrapes GitHub commit patches to surface email addresses from public repositories.
+// Scrapes GitHub commit patches to surface email addresses from public
+// repositories, then ranks each address against the target handle.
+import { rankMatches, type EmailMatch } from './match';
 
 const USER_AGENTS = [
 	'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
@@ -44,19 +46,40 @@ const EXCLUDED_PATHS = new Set([
 
 const VALID_EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-const MAX_REPOS = 6;
-const MAX_COMMITS = 5;
+// Depth bounds. The product (repos × commits) caps total patch fetches, so the
+// ceilings keep a lookup inside the 30s serverless budget and easy on GitHub.
+export const REPO_MIN = 1;
+export const REPO_MAX = 10;
+export const COMMIT_MIN = 1;
+export const COMMIT_MAX = 10;
+export const REPO_DEFAULT = 6;
+export const COMMIT_DEFAULT = 5;
+
 const RETRY_DELAY_MS = 3000;
+const REPO_PAGES = 3; // profile pages to walk when collecting candidate repos
+
+export interface ScanOptions {
+	maxRepos?: number;
+	maxCommits?: number;
+}
 
 export interface ExtractResult {
 	username: string;
 	repos_scanned: number;
-	emails: string[];
+	max_repos: number;
+	max_commits: number;
+	emails: EmailMatch[];
 	email_count: number;
 }
 
 function randomAgent(): string {
 	return USER_AGENTS[(Math.random() * USER_AGENTS.length) | 0];
+}
+
+// Clamps a possibly-undefined value into [min, max], falling back to a default.
+function clamp(value: number | undefined, min: number, max: number, fallback: number): number {
+	const n = Number.isFinite(value) ? Math.trunc(value as number) : fallback;
+	return Math.max(min, Math.min(max, n));
 }
 
 // Escapes regex metacharacters so dynamic repo/user names can't over-match.
@@ -123,13 +146,16 @@ function isValidUsername(username: string): boolean {
 // Lists source repos from the profile's repository tab. The first page also
 // serves as the existence check — a missing user 404s here, so no separate
 // profile request is needed.
-async function getRepos(username: string): Promise<{ repos: string[]; exists: boolean }> {
+async function getRepos(
+	username: string,
+	maxRepos: number
+): Promise<{ repos: string[]; exists: boolean }> {
 	const repos: string[] = [];
 	const seen = new Set<string>();
 	const pattern = new RegExp(`href="/${escapeRegex(username)}/([^/"?#]+)"`, 'gi');
 	let exists = false;
 
-	for (let page = 1; page <= 2; page++) {
+	for (let page = 1; page <= REPO_PAGES; page++) {
 		const html = await fetchPage(
 			`https://github.com/${username}?tab=repositories&page=${page}&type=source`
 		);
@@ -146,14 +172,14 @@ async function getRepos(username: string): Promise<{ repos: string[]; exists: bo
 				repos.push(name);
 			}
 		}
-		if (repos.length >= MAX_REPOS) break;
+		if (repos.length >= maxRepos) break;
 	}
 
-	return { repos: repos.slice(0, MAX_REPOS), exists };
+	return { repos: repos.slice(0, maxRepos), exists };
 }
 
-// Reads up to MAX_COMMITS commit SHAs from a repo's commits page.
-async function getCommitShas(username: string, repo: string): Promise<string[]> {
+// Reads up to maxCommits commit SHAs from a repo's commits page.
+async function getCommitShas(username: string, repo: string, maxCommits: number): Promise<string[]> {
 	const html = await fetchPage(`https://github.com/${username}/${repo}/commits`);
 	if (!html) return [];
 
@@ -165,14 +191,14 @@ async function getCommitShas(username: string, repo: string): Promise<string[]> 
 	let match: RegExpExecArray | null;
 	while ((match = pattern.exec(html)) !== null) {
 		shas.add(match[1]);
-		if (shas.size >= MAX_COMMITS) break;
+		if (shas.size >= maxCommits) break;
 	}
 	return [...shas];
 }
 
 // Fetches each commit patch for a repo in parallel and aggregates emails.
-async function processRepo(username: string, repo: string): Promise<Set<string>> {
-	const shas = await getCommitShas(username, repo);
+async function processRepo(username: string, repo: string, maxCommits: number): Promise<Set<string>> {
+	const shas = await getCommitShas(username, repo, maxCommits);
 	const emails = new Set<string>();
 	if (shas.length === 0) return emails;
 
@@ -185,32 +211,48 @@ async function processRepo(username: string, repo: string): Promise<Set<string>>
 	return emails;
 }
 
-// Full pipeline: validate → list repos (also confirms the user) → scan patches.
-export async function extractEmails(rawUsername: string): Promise<ExtractResult> {
+// Full pipeline: validate → list repos (also confirms the user) → scan patches
+// at the requested depth → rank addresses against the handle.
+export async function extractEmails(
+	rawUsername: string,
+	options: ScanOptions = {}
+): Promise<ExtractResult> {
 	const username = sanitizeUsername(rawUsername);
 	if (!isValidUsername(username)) {
 		throw new Error('invalid github username');
 	}
 
-	const { repos, exists } = await getRepos(username);
+	const maxRepos = clamp(options.maxRepos, REPO_MIN, REPO_MAX, REPO_DEFAULT);
+	const maxCommits = clamp(options.maxCommits, COMMIT_MIN, COMMIT_MAX, COMMIT_DEFAULT);
+
+	const { repos, exists } = await getRepos(username, maxRepos);
 	if (!exists) {
 		throw new Error('user not found');
 	}
 	if (repos.length === 0) {
-		return { username, repos_scanned: 0, emails: [], email_count: 0 };
+		return {
+			username,
+			repos_scanned: 0,
+			max_repos: maxRepos,
+			max_commits: maxCommits,
+			emails: [],
+			email_count: 0
+		};
 	}
 
-	const repoResults = await Promise.all(repos.map((repo) => processRepo(username, repo)));
+	const repoResults = await Promise.all(repos.map((repo) => processRepo(username, repo, maxCommits)));
 	const allEmails = new Set<string>();
 	for (const set of repoResults) {
 		for (const email of set) allEmails.add(email);
 	}
 
-	const sorted = [...allEmails].sort();
+	const ranked = rankMatches(username, [...allEmails]);
 	return {
 		username,
 		repos_scanned: repos.length,
-		emails: sorted,
-		email_count: sorted.length
+		max_repos: maxRepos,
+		max_commits: maxCommits,
+		emails: ranked,
+		email_count: ranked.length
 	};
 }

@@ -1,4 +1,4 @@
-// Handles email extraction requests by delegating to the GitHub scraper
+// Handles email extraction requests by delegating to the GitHub scraper.
 import type { RequestHandler } from './$types';
 import { extractEmails } from '$lib/scraper';
 
@@ -6,7 +6,15 @@ export const config = {
 	maxDuration: 30
 };
 
-// Validates the query parameter and returns extraction results as JSON
+// Reads an optional integer query param, leaving clamping to the scraper.
+function intParam(url: URL, key: string): number | undefined {
+	const raw = url.searchParams.get(key);
+	if (raw === null) return undefined;
+	const n = Number.parseInt(raw, 10);
+	return Number.isNaN(n) ? undefined : n;
+}
+
+// Validates the query and returns ranked extraction results as JSON.
 export const GET: RequestHandler = async ({ url }) => {
 	const query = url.searchParams.get('q')?.trim();
 
@@ -15,7 +23,10 @@ export const GET: RequestHandler = async ({ url }) => {
 	}
 
 	try {
-		const result = await extractEmails(query);
+		const result = await extractEmails(query, {
+			maxRepos: intParam(url, 'repos'),
+			maxCommits: intParam(url, 'commits')
+		});
 		return Response.json({ success: true, ...result });
 	} catch (err) {
 		return Response.json({
