@@ -3,6 +3,7 @@
 	//  · forward (find emails): scrapes public commit patches, ranks matches
 	//  · reverse (find account): probes commit-author linking with your token
 	import { onMount } from 'svelte';
+	import { base } from '$app/paths';
 	import type { ExtractResult, MatchTier, ProbeResult } from '$lib';
 
 	type Direction = 'forward' | 'reverse';
@@ -329,16 +330,25 @@
 	<div class="boot-sweep" aria-hidden="true"></div>
 	<div class="w-full max-w-xl" style="font-family: var(--font-mono)">
 		<!-- Header -->
-		<header class="anim-rise">
-			<h1
-				class="text-4xl font-bold tracking-tight leading-none"
-				style="font-family: var(--font-display); color: var(--text)"
-			>
-				{displayName}<span class="cursor-blink" style="color: var(--signal)">_</span>
-			</h1>
-			<p class="mt-2 text-[11px] uppercase tracking-[0.25em]" style="color: var(--muted)">
-				github identity intelligence
-			</p>
+		<header class="anim-rise flex items-center gap-4">
+			<img
+				src="{base}/kraken.png"
+				alt="kraken logo"
+				width="64"
+				height="72"
+				class="logo-glow h-14 w-auto sm:h-16 shrink-0"
+			/>
+			<div>
+				<h1
+					class="text-4xl font-bold tracking-tight leading-none"
+					style="font-family: var(--font-display); color: var(--text)"
+				>
+					{displayName}<span class="cursor-blink" style="color: var(--signal)">_</span>
+				</h1>
+				<p class="mt-2 text-[11px] uppercase tracking-[0.25em]" style="color: var(--muted)">
+					github identity intelligence
+				</p>
+			</div>
 		</header>
 
 		<!-- Direction toggle -->
